@@ -1,5 +1,4 @@
-name: Terraform Plan
-# change for PR test
+name: Checkov Scan and Terraform Plan
 permissions:
   id-token: write
   contents: write
@@ -12,7 +11,7 @@ on:
 jobs:
 
   plan:
-    name: Plan
+    name: Scan/Plan
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
