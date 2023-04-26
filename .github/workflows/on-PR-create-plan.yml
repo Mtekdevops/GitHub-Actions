@@ -55,7 +55,7 @@ jobs:
       - name: Post Plan to GitHub PR
         uses: mshick/add-pr-comment@v2
         with:
-          allow-repeats: False
+          allow-repeats: True
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           message: |
             ##  TF plan for ${{ steps.branch-name.outputs.current_branch }} branch (Triggered by ${{github.actor}})
