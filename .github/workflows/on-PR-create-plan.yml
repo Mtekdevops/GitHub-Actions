@@ -1,0 +1,64 @@
+name: Terraform Plan
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.4.5
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+          role-duration-seconds: 900
+          aws-region: us-east-1 
+        
+      - name: Run Checkov Action
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          check: 'MEDIUM,HIGH,CRITICAL'
+          api-key: ${{ secrets.CHECKOV_API_KEY }}
+
+      - name: Initialize Terraform
+        run: |
+          cd EKS-Microservice-Terraformed/SetupRemoteState
+          terraform init -input=false
+
+      - name: Plan Terraform
+        id: plan
+        run: |
+          cd EKS-Microservice-Terraformed/SetupRemoteState
+          terraform plan -input=false -no-color -out=tfplan && terraform show -no-color tfplan
+
+      - name: Get branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v6
+
+      - name: Post Plan to GitHub PR
+        uses: mshick/add-pr-comment@v2
+        with:
+          allow-repeats: False
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          message: |
+            ##  TF plan for ${{ steps.branch-name.outputs.current_branch }} branch (Triggered by ${{github.actor}})
+            ```
+            ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
+            ```

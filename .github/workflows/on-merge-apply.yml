@@ -1,0 +1,102 @@
+name: Plan / Apply On Merge
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  inform_about_apply:
+    name: Inform About Apply
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Inform on PR that Apply is Running
+        uses: mshick/add-pr-comment@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          message: |
+            ***Running terraform apply***
+            Results will display here momentarily...
+
+  plan_and_apply:
+    name: Plan and Apply
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.0.9
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+          role-duration-seconds: 900
+          aws-region: us-east-1 
+
+      - name: Initialize Terraform
+        run: |
+          cd EKS-Microservice-Terraformed/SetupRemoteState
+          terraform init -input=false
+
+      - name: Plan Terraform
+        id: plan
+        run: |
+          cd EKS-Microservice-Terraformed/SetupRemoteState
+          terraform plan -input=false -no-color -out=tfplan && terraform show -no-color tfplan
+
+      - name: Apply Terraform
+        if: steps.plan.outcome == 'success'
+        id: apply
+        run: |
+          cd EKS-Microservice-Terraformed/SetupRemoteState
+          terraform apply \
+            -input=false \
+            -no-color \
+            tfplan
+
+      - name: Post Plan and Apply to GitHub PR
+        if: steps.plan.outcome == 'success' && steps.apply.outcome == 'success'
+        uses: mshick/add-pr-comment@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          message: |
+            Plan Applied Successfully:
+
+            ```
+            ${{ steps.apply.outputs.stdout }}
+            ```
+
+      - name: Post Plan Failure
+        if: steps.plan.outcome == 'failure'
+        uses: mshick/add-pr-comment@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          message: |
+            Plan failed:
+
+            ```
+            ${{ steps.plan.outputs.stderr }}
+            ```
+
+      - name: Post Apply Failure
+        if: steps.apply.outcome == 'failure'
+        uses: mshick/add-pr-comment@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          message: |
+            Apply failed:
+
+            ```
+            ${{ steps.apply.outputs.stderr }}
+            ```
