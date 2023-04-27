@@ -44,7 +44,14 @@ jobs:
           directory: .
           check: 'MEDIUM,HIGH,CRITICAL'
           api-key: ${{ secrets.CHECKOV_API_KEY }}
-
+      
+      - name: Check Remote State Existence
+        if: matrix.path == '00-SetupRemoteState'  
+       # shouldnt be needed on a non-test/non-ephemeral environment
+        run: |
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
+          python check_state_exists.py
+      
       - name: Initialize Terraform
         run: |
           cd EKS-Microservice-Terraformed/${{ matrix.path }}
@@ -56,10 +63,9 @@ jobs:
           cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform plan -input=false -no-color -out=tfplan && terraform show -no-color tfplan
 
-      - name: Apply Remote State only
-        # generally you wouldnt deploy this every time in prod, 
-        # but my test environment is set to destroy every 6 hours 
-        if: steps.plan.outcome == 'success' && ${{ matrix.path == '00-SetupRemoteState' }}
+      - name: Apply Remote State only (if missing)
+        # shouldnt be needed on a non-test/non-ephemeral environment
+        if: steps.plan.outcome == 'success' && matrix.path == '00-SetupRemoteState' && env.REMOTE_STATE_EXISTS == 'False'
         id: apply-remote-state
         run: |
           cd EKS-Microservice-Terraformed/${{ matrix.path }}
