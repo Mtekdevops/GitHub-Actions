@@ -50,6 +50,7 @@ jobs:
        # shouldnt be needed on a non-test/non-ephemeral environment
         run: |
           cd EKS-Microservice-Terraformed/${{ matrix.path }}
+          pip install boto3
           python check_state_exists.py
       
       - name: Initialize Terraform
