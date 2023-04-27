@@ -31,7 +31,6 @@ jobs:
       fail-fast: false
       matrix:
         path:
-          - 00-SetupRemoteState
           - 01-EKS-cluster
           - 02-helm-EBS-CLI-driver-install
           - 03-Fleetman-Microservices

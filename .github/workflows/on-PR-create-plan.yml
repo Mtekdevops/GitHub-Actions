@@ -17,7 +17,6 @@ jobs:
       fail-fast: false
       matrix:
         path:
-          - 00-SetupRemoteState
           - 01-EKS-cluster
           - 02-helm-EBS-CLI-driver-install
           - 03-Fleetman-Microservices
@@ -56,6 +55,18 @@ jobs:
           cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform plan -input=false -no-color -out=tfplan && terraform show -no-color tfplan
 
+      - name: Apply Remote State only
+        # generally you wouldnt deploy this every time in prod, 
+        # but my test environment is set to destroy every 6 hours 
+        if: steps.plan.outcome == 'success' && ${{ matrix.path == '00-SetupRemoteState' }}
+        id: apply-remote-state
+        run: |
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
+          terraform apply \
+            -input=false \
+            -no-color \
+            tfplan
+                  
       - name: Get branch name
         id: branch-name
         uses: tj-actions/branch-names@v6
