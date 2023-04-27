@@ -13,6 +13,14 @@ jobs:
   plan:
     name: Scan/Plan
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        path:
+          # should already be setup - adding it just for testing  
+          - SetupOIDC
+          - 00-SetupRemoteState
+      max-parallel: 0
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -38,13 +46,13 @@ jobs:
 
       - name: Initialize Terraform
         run: |
-          cd EKS-Microservice-Terraformed/SetupRemoteState
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform init -input=false
 
       - name: Plan Terraform
         id: plan
         run: |
-          cd EKS-Microservice-Terraformed/SetupRemoteState
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform plan -input=false -no-color -out=tfplan && terraform show -no-color tfplan
 
       - name: Get branch name
@@ -57,7 +65,7 @@ jobs:
           allow-repeats: True
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           message: |
-            ##  TF plan for ${{ steps.branch-name.outputs.current_branch }} branch (Triggered by ${{github.actor}})
+            ##  ${{ matrix.path }} TF plan on ${{ steps.branch-name.outputs.current_branch }} branch (Triggered by ${{github.actor}})
             ```
             ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
             ```
