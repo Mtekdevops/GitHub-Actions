@@ -10,9 +10,30 @@ on:
 
 jobs:
 
-  plan:
-    name: Scan/Plan
+  scan:
+    name: Scan
     runs-on: ubuntu-latest
+    steps:
+      - name: Run Checkov Action
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          check: 'MEDIUM,HIGH,CRITICAL'
+          api-key: ${{ secrets.CHECKOV_API_KEY }}
+ 
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    needs: scan
+    strategy:
+      fail-fast: true
+      matrix:
+        path:
+          - 00-SetupRemoteState
+          - 01-EKS-cluster
+          - 02-helm-EBS-CLI-driver-install
+          - 03-Fleetman-Microservices
+      max-parallel: 1
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -25,28 +46,41 @@ jobs:
       - name: configure aws credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
-          role-duration-seconds: 900
           aws-region: us-east-1 
-        
-      - name: Run Checkov Action
-        uses: bridgecrewio/checkov-action@v12
-        with:
-          directory: .
-          check: 'MEDIUM,HIGH,CRITICAL'
-          api-key: ${{ secrets.CHECKOV_API_KEY }}
-
-      - name: Initialize Terraform
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      
+      - name: Check Remote State Existence
+        if: matrix.path == '00-SetupRemoteState'  
+       # shouldnt be needed on a non-test/non-ephemeral environment
         run: |
-          cd EKS-Microservice-Terraformed/SetupRemoteState
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
+          pip install boto3
+          python check_state_exists.py
+      
+      - name: Initialize Terraform and Kubeconfig
+        run: |
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform init -input=false
+          aws eks --region us-east-1 update-kubeconfig --name it-dev-eks-microservice-demo1
 
       - name: Plan Terraform
         id: plan
         run: |
-          cd EKS-Microservice-Terraformed/SetupRemoteState
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform plan -input=false -no-color -out=tfplan && terraform show -no-color tfplan
 
+      - name: Apply Remote State only (if missing)
+        # shouldnt be needed on a non-test/non-ephemeral environment
+        if: steps.plan.outcome == 'success' && matrix.path == '00-SetupRemoteState' && env.REMOTE_STATE_EXISTS == 'False'
+        id: apply-remote-state
+        run: |
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
+          terraform apply \
+            -input=false \
+            -no-color \
+            tfplan
+                  
       - name: Get branch name
         id: branch-name
         uses: tj-actions/branch-names@v6
@@ -57,7 +91,7 @@ jobs:
           allow-repeats: True
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           message: |
-            ##  TF plan for ${{ steps.branch-name.outputs.current_branch }} branch (Triggered by ${{github.actor}})
+            ##  ${{ matrix.path }} TF plan on ${{ steps.branch-name.outputs.current_branch }} branch (Triggered by ${{github.actor}})
             ```
             ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
             ```

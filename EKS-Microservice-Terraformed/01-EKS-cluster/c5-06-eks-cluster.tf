@@ -1,6 +1,8 @@
 
-# Create AWS EKS Cluster
+# Create AWS EKS Cluster 
 resource "aws_eks_cluster" "eks_cluster" {
+	# checkov:skip=CKV_AWS_38: for github actions testing
+  # checkov:skip=CKV_AWS_58: will enable encryption when K8s secrets are used 
   name     = "${local.name}-${var.cluster_name}"
   role_arn = aws_iam_role.eks_master_role.arn
   version = var.cluster_version
@@ -8,9 +10,9 @@ resource "aws_eks_cluster" "eks_cluster" {
   vpc_config {
     subnet_ids = module.vpc.public_subnets
     endpoint_private_access = var.cluster_endpoint_private_access
-    #checkov:skip=CKV_AWS_39:public access restricted to a single ip is ok for testing, change for prod 
+    #checkov:skip=CKV_AWS_39:public access for test/ephemeral env only
     endpoint_public_access  = var.cluster_endpoint_public_access
-    public_access_cidrs     = local.single-workstation-external-cidr    
+    public_access_cidrs     = ["0.0.0.0/0"]    
   }
 
   kubernetes_network_config {
@@ -26,8 +28,5 @@ resource "aws_eks_cluster" "eks_cluster" {
     aws_iam_role_policy_attachment.eks-AmazonEKSClusterPolicy,
     aws_iam_role_policy_attachment.eks-AmazonEKSVPCResourceController,
   ]
-  encryption_config {
-    resources = ["secrets"]
-  }
 }
 

@@ -27,6 +27,14 @@ jobs:
   plan_and_apply:
     name: Plan and Apply
     runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        path:
+          - 01-EKS-cluster
+          - 02-helm-EBS-CLI-driver-install
+          - 03-Fleetman-Microservices
+      max-parallel: 1
 
     steps:
       - name: Check out code
@@ -40,26 +48,26 @@ jobs:
       - name: configure aws credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
-          role-duration-seconds: 900
           aws-region: us-east-1 
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Initialize Terraform
         run: |
-          cd EKS-Microservice-Terraformed/SetupRemoteState
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform init -input=false
 
       - name: Plan Terraform
         id: plan
         run: |
-          cd EKS-Microservice-Terraformed/SetupRemoteState
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform plan -input=false -no-color -out=tfplan && terraform show -no-color tfplan
 
       - name: Apply Terraform
         if: steps.plan.outcome == 'success'
         id: apply
         run: |
-          cd EKS-Microservice-Terraformed/SetupRemoteState
+          cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform apply \
             -input=false \
             -no-color \
