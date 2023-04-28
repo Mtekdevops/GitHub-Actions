@@ -62,7 +62,7 @@ jobs:
         run: |
           cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform init -input=false
-          aws eks --region us-east-1 update-kubeconfig --name hr-dev-eks-microservice-demo1
+          aws eks --region us-east-1 update-kubeconfig --name it-dev-eks-microservice-demo1
 
       - name: Plan Terraform
         id: plan
