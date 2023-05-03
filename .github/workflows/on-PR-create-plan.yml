@@ -58,11 +58,10 @@ jobs:
           pip install boto3
           python check_state_exists.py
       
-      - name: Initialize Terraform and Kubeconfig
+      - name: Initialize Terraform
         run: |
           cd EKS-Microservice-Terraformed/${{ matrix.path }}
           terraform init -input=false
-          aws eks --region us-east-1 update-kubeconfig --name it-dev-eks-microservice-demo1
 
       - name: Plan Terraform
         id: plan
